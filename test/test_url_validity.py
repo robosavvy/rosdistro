@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from __future__ import print_function
-
+from . import hook_permissions
 
 try:
     from cStringIO import StringIO
@@ -107,6 +107,7 @@ def check_git_remote_exists(url, version, tags_valid=False):
 
 
 def check_source_repo_entry_for_errors(source, tags_valid=False):
+    errors = []
     if source['type'] != 'git':
         print("Cannot verify remote of type[%s] from line [%s] skipping."
               % (source['type'], source['__line__']))
@@ -114,10 +115,25 @@ def check_source_repo_entry_for_errors(source, tags_valid=False):
 
     version = source['version'] if source['version'] else None
     if not check_git_remote_exists(source['url'], version, tags_valid):
-        return ("Could not validate repository with url %s and version %s from"
-                " entry at line '''%s'''" % (source['url'],
-                                             version,
-                                             source['__line__']))
+        errors.append(
+            "Could not validate repository with url %s and version %s from"
+            " entry at line '''%s'''" % (source['url'],
+                                         version,
+                                         source['__line__']))
+    test_pr = source['test_pull_requests'] if 'test_pull_requests' in source else None
+    if test_pr:
+        o = urlparse(source['url'])
+        if 'github.com' in o.netloc:
+            user = os.path.dirname(o.path).lstrip('/')
+            repo, _ = os.path.splitext(os.path.basename(o.path))
+            hook_errors = []
+            hooks_valid = hook_permissions.check_hooks_on_repo(user, repo, hook_errors, hook_user='ros-pull-request-builder', callback_url='http://build.ros.org/ghprbhook/', token=os.getenv('ROSGHPRB_TOKEN'))
+            if not hooks_valid:
+                errors += hook_errors
+        else:
+            errors.append("Pull Request builds only supported on GitHub right now. Cannot do pull request against %s" % o.netloc)
+    if errors:
+        return(" ".join(errors))
     return None
 
 
