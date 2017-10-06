@@ -127,9 +127,13 @@ def check_source_repo_entry_for_errors(source, tags_valid=False):
             user = os.path.dirname(o.path).lstrip('/')
             repo, _ = os.path.splitext(os.path.basename(o.path))
             hook_errors = []
-            hooks_valid = hook_permissions.check_hooks_on_repo(user, repo, hook_errors, hook_user='ros-pull-request-builder', callback_url='http://build.ros.org/ghprbhook/', token=os.getenv('ROSGHPRB_TOKEN'))
-            if not hooks_valid:
-                errors += hook_errors
+            rosghprb_token = os.getenv('ROSGHPRB_TOKEN', None)
+            if not rosghprb_token:
+                print("No ROSGHPRB_TOKEN set, continuing without checking hooks")
+            else:
+                hooks_valid = hook_permissions.check_hooks_on_repo(user, repo, hook_errors, hook_user='ros-pull-request-builder', callback_url='http://build.ros.org/ghprbhook/', token=rosghprb_token)
+                if not hooks_valid:
+                    errors += hook_errors
         else:
             errors.append("Pull Request builds only supported on GitHub right now. Cannot do pull request against %s" % o.netloc)
     if errors:
